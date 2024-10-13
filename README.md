@@ -1,34 +1,26 @@
-!
-!
-!
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 # Whisper
+
+
+
+```bash
+pip install -r requirements.txt
+
+pip3 install --force-reinstall torch torchtext torchvision torchaudio torchrec --extra-index-url https://download.pytorch.org/whl/cu124
+
+Если возникнут проблемы
+pip uninstall numpy numba
+pip install numpy==1.22
+pip install numba
+pip install --upgrade pip setuptools
+pip install wheel
+
+Пример
+whisper *.m4a --model turbo --output_format txt --language Russian --device cuda
+```
+
+logic.py - транскрипция всех аудиофайлов в выбранной папке. (VTT TXT)
+---
 
 [[Blog]](https://openai.com/blog/whisper)
 [[Paper]](https://arxiv.org/abs/2212.04356)
