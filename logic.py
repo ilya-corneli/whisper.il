@@ -33,7 +33,7 @@ def transcribe_folder(input_folder, model):
         if os.path.isdir(filepath):
             # Рекурсивный вызов для подпапки
             transcribe_folder(filepath, model)
-        elif filename.endswith((".wav", ".m4a", ".mp3")):
+        elif filename.endswith((".wav", ".m4a", ".mp3", ".ogg")):
             try:
                 result = model.transcribe(filepath)
 
