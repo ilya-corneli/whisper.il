@@ -25,17 +25,16 @@ def sync_directories(src_dir, dest_dir):
             dest_path = os.path.join(dest_dir, relative_path)
             os.makedirs(dest_path, exist_ok=True)
 
-def transcribe_audio_files(input_folder, output_base_folder):
-    sync_directories(input_folder, output_base_folder)
-
+def transcribe_audio_files(input_folder, output_base_folder, base_input_folder): # Добавили base_input_folder
     for root, _, files in os.walk(input_folder):
         for file in files:
             if file.endswith(('.wav', '.m4a', '.mp3', '.ogg')):
                 file_path = os.path.join(root, file)
 
-                relative_path = os.path.relpath(root, input_folder)
+                # Используем base_input_folder для относительного пути
+                relative_path = os.path.relpath(root, base_input_folder)
                 output_folder = os.path.join(output_base_folder, relative_path)
-                os.makedirs(output_folder, exist_ok=True)  # Создание папки, если её нет
+                os.makedirs(output_folder, exist_ok=True)
 
                 text_filename = os.path.splitext(file)[0] + ".txt"
                 text_path = os.path.join(output_folder, text_filename)
@@ -59,4 +58,7 @@ if __name__ == "__main__":
     specific_folder = input("Введите название конкретной папки внутри Audiobooks: ")
     input_folder = os.path.join(base_input_folder, specific_folder)
 
-    transcribe_audio_files(input_folder, output_base_folder)
+    # Синхронизируем структуру папок перед транскрипцией
+    sync_directories(base_input_folder, output_base_folder)
+
+    transcribe_audio_files(input_folder, output_base_folder, base_input_folder) # Передаем base_input_folder
