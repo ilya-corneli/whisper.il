@@ -60,5 +60,6 @@ if __name__ == "__main__":
 
     # Синхронизируем структуру папок перед транскрипцией
     sync_directories(base_input_folder, output_base_folder)
+    
 
     transcribe_audio_files(input_folder, output_base_folder, base_input_folder) # Передаем base_input_folder
