@@ -52,14 +52,14 @@ def transcribe_audio_files(input_folder, output_base_folder, base_input_folder):
                     print(f"Ошибка при обработке файла {file}: {e}")
 
 if __name__ == "__main__":
-    base_input_folder = "G:\\Mediafiles\\Audio\\Audiobooks"
-    output_base_folder = "G:\\Mediafiles\\Bigdata\\Транскрипции"
+    base_input_folder = "G:\\mediafiles\\audio\\audiobooks"
+    output_base_folder = "G:\\mediafiles\\bigdata\\транскрипции"
 
     specific_folder = input("Введите название конкретной папки внутри Audiobooks: ")
     input_folder = os.path.join(base_input_folder, specific_folder)
 
     # Синхронизируем структуру папок перед транскрипцией
     sync_directories(base_input_folder, output_base_folder)
-    
+
 
     transcribe_audio_files(input_folder, output_base_folder, base_input_folder) # Передаем base_input_folder
