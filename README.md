@@ -4,16 +4,13 @@
 
 
 ```bash
-pip install -r requirements.txt
-
-pip3 install --force-reinstall torch torchtext torchvision torchaudio torchrec --extra-index-url https://download.pytorch.org/whl/cu124
-
-Если возникнут проблемы
-pip uninstall numpy numba
-pip install numpy==1.22
-pip install numba
-pip install --upgrade pip setuptools
-pip install wheel
+pip install -U openai-whisper
+pip install --upgrade --no-deps --force-reinstall git+https://github.com/openai/whisper.git
+scoop install ffmpeg
+pip install setuptools-rust
+pip3 install --force-reinstall torch torchtext torchvision torchaudio torchrec --extra-index-url https://download.pytorch.org/whl/cu118
+pip install pillow==10.0.0
+pip install numpy==2.1.0
 
 Пример
 whisper *.m4a --model turbo --output_format txt --language Russian --device cuda

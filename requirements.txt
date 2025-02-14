@@ -1,7 +1,10 @@
-numba
-numpy
-torch
-tqdm
-more-itertools
-tiktoken
-triton>=2.0.0;platform_machine=="x86_64" and sys_platform=="linux" or sys_platform=="linux2"
+
+pip install -U openai-whisper
+pip install --upgrade --no-deps --force-reinstall git+https://github.com/openai/whisper.git
+scoop install ffmpeg
+pip install setuptools-rust
+pip3 install --force-reinstall torch torchtext torchvision torchaudio torchrec --extra-index-url https://download.pytorch.org/whl/cu118
+pip install pillow==10.0.0
+pip install numpy==2.1.0
+
+pip install pydub
