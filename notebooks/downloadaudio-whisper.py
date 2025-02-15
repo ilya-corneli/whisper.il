@@ -21,9 +21,8 @@ def download_and_transcribe(video_url: str, output_path: str = "C:\\files\\MEGA\
     audio_file_sanitized = os.path.join(output_path, f"{sanitized_title}.m4a")
 
     ydl_opts = {
-        'format': '251', # Указываем конкретный формат - 251 (обычно это m4a)
-        'extract_audio': False, #  ***ОТКЛЮЧАЕМ extract_audio***, так как формат уже аудио
-        #'audio_format': 'm4a', #  Больше не нужно
+        'format': '251',
+        'extract_audio': False,
         'outtmpl': audio_file_sanitized,
         'keepvideo': False,
     }
@@ -65,5 +64,12 @@ def transcribe_audio(file_path: str, output_folder: str):
         logging.error(f"Ошибка при обработке файла {file_path}: {e}")
 
 if __name__ == "__main__":
-    video_url = input("Введите URL видео: ")
-    download_and_transcribe(video_url)
+    video_urls_input = input("Введите URL видео (через пробел, если несколько): ")
+    video_urls = video_urls_input.split() # Разделяем введенную строку на список URL по пробелам
+
+    for video_url in video_urls: # Итерируемся по списку URL
+        logging.info(f"Обработка URL: {video_url}") # Добавим лог для отслеживания текущего URL
+        download_and_transcribe(video_url)
+        logging.info(f"Обработка URL {video_url} завершена.\n") # Лог после обработки каждого URL
+
+    logging.info("Обработка всех URL завершена.")
