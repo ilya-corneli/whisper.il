@@ -48,14 +48,28 @@ def download_video(video_url: str, output_path: str, format_selector='bestaudio[
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([video_url])
 
+            # **TROUBLESHOOTING: Check file existence immediately after download**
+            expected_downloaded_file = os.path.join(output_path, f"{sanitized_title}.webm") # Assuming webm based on previous log
+            if os.path.exists(expected_downloaded_file):
+                logging.info(f"TROUBLESHOOTING: Файл существует сразу после загрузки: {expected_downloaded_file}")
+            else:
+                logging.warning(f"TROUBLESHOOTING: Файл НЕ существует сразу после загрузки: {expected_downloaded_file}")
+
 
             # Find the downloaded file (yt-dlp might add format extension) and rename to .m4a
             downloaded_file = None
-            for ext in ['.m4a', '.webm', '.mp3', '.aac', '.opus']: # Common audio extensions
+            for ext in ['m4a', 'webm', 'mp3', 'aac', 'opus']: # Common audio extensions
                 temp_file_path = os.path.join(output_path, f"{sanitized_title}.{ext}")
                 if os.path.exists(temp_file_path):
                     downloaded_file = temp_file_path
                     break
+
+            # **TROUBLESHOOTING: List all files in output_path if not found by extension**
+            if downloaded_file is None:
+                all_files_in_output_path = os.listdir(output_path)
+                logging.warning(f"TROUBLESHOOTING: Аудиофайл не найден по расширениям. Файлы в output_path: {all_files_in_output_path}")
+
+
             if downloaded_file: # Check if a file was actually downloaded
                 if downloaded_file != audio_file_m4a: # Rename only if extensions are different
                     os.rename(downloaded_file, audio_file_m4a)
