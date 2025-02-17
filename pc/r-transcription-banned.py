@@ -10,10 +10,13 @@ import time  # Для повторных попыток и задержек
 
 logging.basicConfig(level=logging.INFO)
 
-def sanitize_filename(filename):
+def sanitize_filename(filename, max_length=200):  # Добавим параметр max_length
     filename = filename.lower().replace(" ", "-")
     filename = re.sub(r'[^a-zа-я0-9-]', '', filename)
     filename = filename.strip('-')
+    if len(filename) > max_length: # Обрезаем имя файла, если оно слишком длинное
+        filename = filename[:max_length]
+        logging.warning(f"Имя файла было обрезано до {max_length} символов: {filename}...") # Добавим предупреждение о обрезке
     return filename
 
 def check_ffmpeg():
@@ -24,15 +27,21 @@ def check_ffmpeg():
     except (FileNotFoundError, subprocess.CalledProcessError):
         return False
 
-def download_video(video_url: str, output_path: str, format_selector='hls-0', progress=False, retries=3, retry_delay=5):
+def download_video(video_url: str, output_path: str, format_selector='bestaudio[abr<128]/bestaudio/best', progress=False, retries=3, retry_delay=5):
     """Загружает видео с заданным URL с повторными попытками."""
-    sanitized_title = sanitize_filename(yt_dlp.YoutubeDL().extract_info(video_url, download=False).get('title', 'UnknownTitle'))
-    video_file_downloaded = os.path.join(output_path, f"{sanitized_title}.mp4")
+    info_dict = yt_dlp.YoutubeDL().extract_info(video_url, download=False)
+    video_title = info_dict.get('title', 'UnknownTitle')
+    sanitized_title = sanitize_filename(video_title)
+    audio_file_downloaded = os.path.join(output_path, f"{sanitized_title}.%(ext)s") # Save with original extension first
+    audio_file_m4a = os.path.join(output_path, f"{sanitized_title}.m4a") # Final m4a file path
+
 
     ydl_opts = {
-        'format': format_selector,
-        'outtmpl': video_file_downloaded,
-        'keepvideo': True,
+        'format': format_selector, # Используем динамический селектор форматов
+        'outtmpl': audio_file_downloaded, # Save with original extension
+        'extract_audio': True,    # Ensure audio extraction
+        'audioformat': 'm4a',     # Convert to m4a (if needed, ffmpeg will handle if direct audio is not m4a)
+        'keepvideo': False,        # We want only audio, no video
         'nopart': True,
         'noprogress': not progress, # Прогресс бар включается/выключается опцией
         'rm-cache-dir': True,
@@ -40,73 +49,114 @@ def download_video(video_url: str, output_path: str, format_selector='hls-0', pr
 
     for attempt in range(retries + 1):
         try:
-            logging.info(f"Начинаем загрузку видео (попытка {attempt + 1}/{retries + 1}): {video_url} в {video_file_downloaded}")
+            logging.info(f"Начинаем загрузку аудио (попытка {attempt + 1}/{retries + 1}): {video_url} в {audio_file_downloaded}")
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([video_url])
-            return video_file_downloaded  # Успешная загрузка
+
+
+            # Find the downloaded file (yt-dlp might add format extension) and rename to .m4a
+            downloaded_file = None
+            for ext in ['.m4a', '.webm', '.mp3', '.aac', '.opus']: # Common audio extensions
+                temp_file_path = os.path.join(output_path, f"{sanitized_title}.{ext}")
+                if os.path.exists(temp_file_path):
+                    downloaded_file = temp_file_path
+                    break
+
+            # TROUBLESHOOTING: List all files in output_path if not found by extension
+            if downloaded_file is None:
+                all_files_in_output_path = os.listdir(output_path)
+                logging.warning(f"TROUBLESHOOTING: Аудиофайл не найден по расширениям. Файлы в output_path: {all_files_in_output_path}")
+
+
+            if downloaded_file: # Check if a file was actually downloaded
+                if downloaded_file != audio_file_m4a: # Rename only if extensions are different
+                    os.rename(downloaded_file, audio_file_m4a)
+                    logging.info(f"Переименовано в {audio_file_m4a}")
+                return audio_file_m4a # Return final .m4a path
+            else:
+                logging.error(f"Ошибка: аудиофайл не был загружен для URL: {video_url}")
+                return None
+
+
         except yt_dlp.utils.DownloadError as e:
             if attempt < retries:
                 logging.warning(f"Ошибка загрузки (попытка {attempt + 1}/{retries + 1}): {e}. Повторная попытка через {retry_delay} секунд...")
                 time.sleep(retry_delay)
                 retry_delay *= 2 # Экспоненциальная задержка
             else:
-                logging.error(f"Не удалось загрузить видео после {retries + 1} попыток: {e}")
+                logging.error(f"Не удалось загрузить аудио после {retries + 1} попыток: {e}")
                 return None # Не удалось загрузить
         except Exception as e: # Ловим другие непредвиденные ошибки загрузки
-            logging.error(f"Непредвиденная ошибка при загрузке видео: {e}")
+            logging.error(f"Непредвиденная ошибка при загрузке аудио: {e}")
             return None
 
-def extract_audio_ffmpeg(video_file: str, audio_file_sanitized: str):
-    """Извлекает аудио из видеофайла с помощью ffmpeg."""
-    logging.info(f"Извлекаем аудио из видео {video_file} в {audio_file_sanitized}")
+
+def extract_audio_ffmpeg(audio_file_input: str, audio_file_sanitized: str):
+    """Конвертирует аудиофайл в m4a с помощью ffmpeg."""
+    logging.info(f"Конвертируем аудио в m4a с помощью ffmpeg: {audio_file_input} -> {audio_file_sanitized}") # Изменено сообщение
     try:
         result = subprocess.run([
             "ffmpeg",
-            "-i", video_file,
-            "-vn",
-            "-acodec", "copy",
-            audio_file_sanitized
+            "-i", audio_file_input, # Используем входной аудиофайл
+            "-acodec", "aac",        # Явно кодируем в AAC (m4a)
+            "-ab", "128k",         # Битрейт 128kbps (можно настроить)
+            "-vn",                 # Нет видео
+            "-y",                   # Перезаписать, если существует
+            audio_file_sanitized   # Выходной m4a файл
         ], check=True, capture_output=True)
-        logging.info(f"Аудио успешно извлечено и сохранено в {audio_file_sanitized}")
+        logging.info(f"Аудио успешно конвертировано в m4a: {audio_file_sanitized}")
     except subprocess.CalledProcessError as e:
-        logging.error(f"Ошибка ffmpeg при извлечении аудио (код возврата: {e.returncode}): {e.stderr.decode()}")
+        logging.error(f"Ошибка ffmpeg при конвертации аудио (код возврата: {e.returncode}): {e.stderr.decode()}")
         return False
     except FileNotFoundError:
         logging.error("Ошибка: ffmpeg не найден. Убедитесь, что ffmpeg установлен и добавлен в PATH.")
         return False
     except Exception as e:
-        logging.error(f"Непредвиденная ошибка при извлечении аудио ffmpeg: {e}")
+        logging.error(f"Непредвиденная ошибка при конвертации аудио ffmpeg: {e}")
         return False
+    finally:
+        if os.path.exists(audio_file_input): # Check if input file exists before trying to delete
+            os.remove(audio_file_input) # Remove original downloaded audio file after conversion
+            logging.info(f"Временный аудиофайл {audio_file_input} удален после конвертации.")
     return True
 
 
 def download_and_transcribe(video_url: str, output_path: str, whisper_model_name: str, progress=False):
-    """Скачивает видео, извлекает аудио и транскрибирует."""
+    """Скачивает аудио, извлекает аудио и транскрибирует."""
 
     info_dict = yt_dlp.YoutubeDL().extract_info(video_url, download=False)
     video_title = info_dict.get('title', 'UnknownTitle')
     sanitized_title = sanitize_filename(video_title)
-    audio_file_sanitized = os.path.join(output_path, f"{sanitized_title}.m4a")
-    text_path = os.path.join(output_path, f"{sanitized_title}.txt")
+
+    # **Определение подпапки на основе хостинга**
+    if "banned.video" in video_url:
+        hosting_folder = os.path.join(output_path, "banned.video")
+    elif "youtube.com" in video_url: # Можно добавить другие хостинги по аналогии
+        hosting_folder = os.path.join(output_path, "youtube.com")
+    else:
+        hosting_folder = output_path # По умолчанию - в основную папку
+
+    # **Создание подпапки, если ее нет**
+    os.makedirs(hosting_folder, exist_ok=True)
+
+    audio_file_sanitized = os.path.join(hosting_folder, f"{sanitized_title}.m4a") # Путь к файлу в подпапке
+    text_path = os.path.join(hosting_folder, f"{sanitized_title}.txt") # Путь к текстовому файлу в подпапке
 
 
     if os.path.exists(text_path):
         logging.info(f"Транскрипция для {video_url} уже существует. Пропуск.")
         return
 
-    video_file_downloaded = download_video(video_url, output_path, progress=progress)
-    if not video_file_downloaded:
+    audio_file_downloaded = download_video(video_url, hosting_folder, progress=progress) # Скачиваем в подпапку
+    if not audio_file_downloaded:
         return # Если загрузка не удалась, выходим
 
-    if not extract_audio_ffmpeg(video_file_downloaded, audio_file_sanitized):
-        return # Если извлечение аудио не удалось, выходим
+    # No ffmpeg conversion needed anymore for YouTube, we download m4a directly (or similar)
+    if not extract_audio_ffmpeg(audio_file_downloaded, audio_file_sanitized): # Конвертируем в m4a, если необходимо
+        return # Если конвертация аудио не удалась, выходим
 
-    # Удаляем временный видеофайл после извлечения аудио
-    if os.path.exists(video_file_downloaded):
-        os.remove(video_file_downloaded)
-        logging.info(f"Временный видеофайл {video_file_downloaded} удален.")
 
-    transcribe_audio(audio_file_sanitized, output_path, whisper_model_name)
+    transcribe_audio(audio_file_sanitized, hosting_folder, whisper_model_name) # Транскрибируем в подпапке
 
 
 def transcribe_audio(file_path: str, output_folder: str, whisper_model_name: str):
@@ -115,7 +165,7 @@ def transcribe_audio(file_path: str, output_folder: str, whisper_model_name: str
     model = whisper.load_model(whisper_model_name, device=device)
 
     text_filename = os.path.splitext(os.path.basename(file_path))[0] + ".txt"
-    text_path = os.path.join(output_folder, text_filename) # <-- Исправлено здесь!
+    text_path = os.path.join(output_folder, text_filename)
 
     if os.path.exists(text_path):
         logging.info(f"Транскрипция для {file_path} уже существует. Пропуск.")
